@@ -9,14 +9,16 @@ MAGIC_LENGTH = 4
 HEADER_FORMAT = '4s256sII'
 HEADER_SIZE = struct.calcsize(HEADER_FORMAT)
 
-FILE_ENTRY_HEADER_FORMAT = '>44sII'
+FILE_ENTRY_HEADER_FORMAT = '>32sIIIII'
 FILE_ENTRY_HEADER_SIZE = struct.calcsize(FILE_ENTRY_HEADER_FORMAT)
+assert(FILE_ENTRY_HEADER_SIZE == 52)
 
 FILE_ENTRY_FOOTER_FORMAT = 'II'
 FILE_ENTRY_FOOTER_SIZE = struct.calcsize(FILE_ENTRY_FOOTER_FORMAT)
 
 SIGNATURE_FORMAT = '256sI'
 SIGNATURE_SIZE = struct.calcsize(SIGNATURE_FORMAT)
+CHUNK_SIZE = 1024 * 64
 
 
 class InvalidDataError(RuntimeError):
@@ -27,8 +29,8 @@ class FirmwareFileEntry(object):
     def __init__(self, stream):
         self.stream = stream
         self.pos = stream.seek(0, io.SEEK_CUR) - MAGIC_LENGTH
-        entry_name, self.length, self.flags = struct.unpack(FILE_ENTRY_HEADER_FORMAT, stream.read(FILE_ENTRY_HEADER_SIZE))
-        self.name = entry_name.rstrip(b'\0')
+        entry_name, self.index, unknown, unk2, self.length, self.flags = struct.unpack(FILE_ENTRY_HEADER_FORMAT, self.stream.read(FILE_ENTRY_HEADER_SIZE))
+        self.name = entry_name.rstrip(b'\0').decode('utf-8')
         self.start = stream.seek(0, io.SEEK_CUR)
         stream.seek(self.length, io.SEEK_CUR)
         self.checksum, skip = struct.unpack(FILE_ENTRY_FOOTER_FORMAT, stream.read(FILE_ENTRY_FOOTER_SIZE))
@@ -39,9 +41,15 @@ class FirmwareFileEntry(object):
             output = io.FileIO(output, 'wb')
 
         self.stream.seek(self.pos, io.SEEK_SET)
+        remaining_bytes = self.length
 
-        while True:
-            buffer = self.stream.read(1024 * 64)
+        while remaining_bytes > 0:
+            chunk = CHUNK_SIZE
+            if remaining_bytes < CHUNK_SIZE:
+                chunk = remaining_bytes
+
+            buffer = self.stream.read(chunk)
+            remaining_bytes -= chunk
 
             if buffer == b'':
                 break
