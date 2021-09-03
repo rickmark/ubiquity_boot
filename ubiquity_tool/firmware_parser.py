@@ -40,7 +40,7 @@ class FirmwareFileEntry(object):
         if isinstance(output, str):
             output = io.FileIO(output, 'wb')
 
-        self.stream.seek(self.pos, io.SEEK_SET)
+        self.stream.seek(self.pos + FILE_ENTRY_HEADER_SIZE + MAGIC_LENGTH, io.SEEK_SET)
         remaining_bytes = self.length
 
         while remaining_bytes > 0:
